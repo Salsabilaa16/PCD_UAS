@@ -10,8 +10,7 @@ import matplotlib.pyplot as plt
 import cv2
 import io
 
-st.set_option('deprecation.showPyplotGlobalUse', False)
-st.title("PCD Image Processing Pipeline")
+st.title("Detection Cancer Serviks")
 
 # File Uploads
 excel_file = st.file_uploader("Upload Excel Metadata (.xlsx)", type=["xlsx"])

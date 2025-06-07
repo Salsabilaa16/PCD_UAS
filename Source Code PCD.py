@@ -2,7 +2,6 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 from PIL import Image
-from collections import defaultdict
 from skimage.feature import graycomatrix, graycoprops
 from skimage.measure import regionprops
 from skimage.draw import rectangle_perimeter
@@ -11,20 +10,9 @@ import cv2
 
 st.title("Deteksi Kanker Serviks")
 
-# File Upload
-image_files = st.file_uploader("Upload Image Files (Gunakan nama file seperti normal_1.jpg, abnormal_2.png)", 
-                                type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+image_files = st.file_uploader("Upload Image Files", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
 
 if image_files:
-    labeled_images = defaultdict(list)
-
-    for img_file in image_files:
-        filename = img_file.name
-        label = filename.split('_')[0].lower()  # Ambil label dari nama file
-        image = Image.open(img_file)
-        labeled_images[label].append(image)
-
-    # Definisi fungsi-fungsi preprocessing
     def rgb_to_grayscale_manual(image_array):
         return np.dot(image_array[..., :3], [0.2989, 0.5870, 0.1140])
 
@@ -83,46 +71,46 @@ if image_files:
     kernel = np.ones((3,3), dtype=int)
     features_list = []
 
-    for label, imgs in labeled_images.items():
-        for img in imgs:
-            gray = rgb_to_grayscale_manual(np.array(img)).astype('uint8')
-            median = median_filter(gray)
-            equalized = histogram_equalization(median)
-            adaptive = apply_adaptive_thresholding(equalized, block_size=25, C=3)
-            morph = closing_opening(adaptive, kernel)
+    for img_file in image_files:
+        img = Image.open(img_file)
+        gray = rgb_to_grayscale_manual(np.array(img)).astype('uint8')
+        median = median_filter(gray)
+        equalized = histogram_equalization(median)
+        adaptive = apply_adaptive_thresholding(equalized, block_size=25, C=3)
+        morph = closing_opening(adaptive, kernel)
 
-            for _ in range(2):
-                morph = dilate(erode(morph, kernel), kernel)
+        for _ in range(2):
+            morph = dilate(erode(morph, kernel), kernel)
 
-            glcm = graycomatrix(morph, distances=[1], angles=[0], levels=256, symmetric=True, normed=True)
-            features = {
-                'label': label,
-                'contrast': graycoprops(glcm, 'contrast')[0, 0],
-                'dissimilarity': graycoprops(glcm, 'dissimilarity')[0, 0],
-                'homogeneity': graycoprops(glcm, 'homogeneity')[0, 0],
-                'energy': graycoprops(glcm, 'energy')[0, 0],
-                'correlation': graycoprops(glcm, 'correlation')[0, 0],
-                'ASM': graycoprops(glcm, 'ASM')[0, 0],
-            }
-            features_list.append(features)
+        glcm = graycomatrix(morph, distances=[1], angles=[0], levels=256, symmetric=True, normed=True)
+        features = {
+            'image_name': img_file.name,
+            'contrast': graycoprops(glcm, 'contrast')[0, 0],
+            'dissimilarity': graycoprops(glcm, 'dissimilarity')[0, 0],
+            'homogeneity': graycoprops(glcm, 'homogeneity')[0, 0],
+            'energy': graycoprops(glcm, 'energy')[0, 0],
+            'correlation': graycoprops(glcm, 'correlation')[0, 0],
+            'ASM': graycoprops(glcm, 'ASM')[0, 0],
+        }
+        features_list.append(features)
 
-            labeled = (morph > 0).astype(np.uint8)
-            _, labeled_img = cv2.connectedComponents(labeled)
-            img_rgb = np.stack([gray]*3, axis=-1)
-            for region in regionprops(labeled_img):
-                if region.area > 300:
-                    minr, minc, maxr, maxc = region.bbox
-                    rr, cc = rectangle_perimeter((minr, minc), end=(maxr-1, maxc-1), shape=img_rgb.shape)
-                    img_rgb[rr, cc] = [255, 0, 0]
+        labeled = (morph > 0).astype(np.uint8)
+        _, labeled_img = cv2.connectedComponents(labeled)
+        img_rgb = np.stack([gray]*3, axis=-1)
+        for region in regionprops(labeled_img):
+            if region.area > 300:
+                minr, minc, maxr, maxc = region.bbox
+                rr, cc = rectangle_perimeter((minr, minc), end=(maxr-1, maxc-1), shape=img_rgb.shape)
+                img_rgb[rr, cc] = [255, 0, 0]
 
-            fig, ax = plt.subplots(1, 2, figsize=(10,4))
-            ax[0].imshow(gray, cmap='gray')
-            ax[0].set_title("Grayscale")
-            ax[0].axis('off')
-            ax[1].imshow(img_rgb)
-            ax[1].set_title("Lesion Detection")
-            ax[1].axis('off')
-            st.pyplot(fig)
+        fig, ax = plt.subplots(1, 2, figsize=(10,4))
+        ax[0].imshow(gray, cmap='gray')
+        ax[0].set_title(f"Grayscale: {img_file.name}")
+        ax[0].axis('off')
+        ax[1].imshow(img_rgb)
+        ax[1].set_title("Lesion Detection")
+        ax[1].axis('off')
+        st.pyplot(fig)
 
-    st.subheader("GLCM Features")
+    st.subheader("GLCM Features for Each Image")
     st.dataframe(pd.DataFrame(features_list))

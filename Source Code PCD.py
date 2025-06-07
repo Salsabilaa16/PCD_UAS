@@ -8,25 +8,23 @@ from skimage.measure import regionprops
 from skimage.draw import rectangle_perimeter
 import matplotlib.pyplot as plt
 import cv2
-import io
 
-st.title("Detection Cancer Serviks")
+st.title("Deteksi Kanker Serviks")
 
-# File Uploads
-excel_file = st.file_uploader("Upload Excel Metadata (.xlsx)", type=["xlsx"])
-image_files = st.file_uploader("Upload Image Files", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+# File Upload
+image_files = st.file_uploader("Upload Image Files (Gunakan nama file seperti normal_1.jpg, abnormal_2.png)", 
+                                type=["png", "jpg", "jpeg"], accept_multiple_files=True)
 
-if excel_file and image_files:
-    df = pd.read_excel(excel_file)
-    image_dict = {img.name: img for img in image_files}
+if image_files:
     labeled_images = defaultdict(list)
 
-    for _, row in df.iterrows():
-        filename, label = row['File'], row['Type']
-        if filename in image_dict:
-            image = Image.open(image_dict[filename])
-            labeled_images[label].append(image)
+    for img_file in image_files:
+        filename = img_file.name
+        label = filename.split('_')[0].lower()  # Ambil label dari nama file
+        image = Image.open(img_file)
+        labeled_images[label].append(image)
 
+    # Definisi fungsi-fungsi preprocessing
     def rgb_to_grayscale_manual(image_array):
         return np.dot(image_array[..., :3], [0.2989, 0.5870, 0.1140])
 
@@ -83,7 +81,6 @@ if excel_file and image_files:
         return dilate(erode(dilate(img, kernel), kernel), kernel)
 
     kernel = np.ones((3,3), dtype=int)
-    processed_images = defaultdict(list)
     features_list = []
 
     for label, imgs in labeled_images.items():
@@ -94,7 +91,8 @@ if excel_file and image_files:
             adaptive = apply_adaptive_thresholding(equalized, block_size=25, C=3)
             morph = closing_opening(adaptive, kernel)
 
-            for _ in range(2): morph = dilate(erode(morph, kernel), kernel)
+            for _ in range(2):
+                morph = dilate(erode(morph, kernel), kernel)
 
             glcm = graycomatrix(morph, distances=[1], angles=[0], levels=256, symmetric=True, normed=True)
             features = {

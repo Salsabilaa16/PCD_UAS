@@ -8,9 +8,9 @@ from skimage.draw import rectangle_perimeter
 import matplotlib.pyplot as plt
 import cv2
 
-st.title("Deteksi Kanker Serviks")
+st.title("Cervical Cancer Detection")
 
-image_files = st.file_uploader("Input Gambar", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+image_files = st.file_uploader("Upload Image Files", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
 
 if image_files:
     def rgb_to_grayscale_manual(image_array):
